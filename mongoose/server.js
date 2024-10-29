@@ -1,16 +1,10 @@
 const express = require('express')
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const bcrypt = require('bcrypt');
 const app = express();
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });  
 
 app.use(cors({
-    origin: 'http://localhost:5173',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
+    credentials: true, origin: "http://localhost:5173"
 }));
 
 // body-parser에 요청 본문 크기 제한 설정
@@ -19,86 +13,11 @@ app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 
 const db = require("./model");
 const Post = require('./postModel');
-const User = require('./registerModel');
 db.main();
 
-app.get("/", (req, res) => {
+app.get("/", (res) => {
     res.json({ message: "connected" })
 })
-
-// 회원가입 라우트
-app.post('/register', upload.single('userImage'), async (req, res) => {
-    const { account, password, userName, commentedArticles } = req.body;
-    const userImage = req.file;
-  
-  
-  
-    try {
-      if (!account || !password || !userName) {
-        return res.status(400).json({ message: '필수 정보를 입력해주세요.' });
-      }
-      if (password.length < 8) {
-        return res.status(400).json({ message: '비밀번호는 8자리 이상이어야 합니다.' });
-      }
-  
-       // 이메일 중복 확인
-      const email = await User.findOne({ account });
-      if (email) {
-        return res.status(400).json({ message: '이미 등록된 이메일입니다.' }); // 이메일 중복 에러 메시지
-      }
-  
-      // 비밀번호 암호화
-      const hashedPassword = await bcrypt.hash(password, 10);
-      
-      // 새로운 유저 생성
-      const newUser = new User({
-        account,
-        password: hashedPassword, // 비밀번호 암호화
-        userName,
-        userImage: userImage ? userImage.path : null,
-        commentedArticles,
-      });
-  
-      await newUser.save(); // 데이터베이스에 유저 저장
-  
-      res.status(200).json({ message: '회원가입이 완료되었습니다!' });
-    } catch (error) {
-      if(error.name == 'MongoNetworkError') {
-        return res.status(500).json({ message: '데이터베이스 연결에 실패했습니다.' });
-      }
-      res.status(500).json({ message: '회원가입 중 서버 오류가 발생했습니다.' });
-    }
-  });
-
-
-// 로그인 라우트
-app.post('/login', async (req, res) => {
-    try {
-      const { account, password } = req.body;
-  
-      // 유저 찾기
-      const user = await User.findOne({ account });
-  
-      if (!user) {
-        return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
-      }
-  
-      // 비밀번호 비교
-      const isMatch = await bcrypt.compare(password, user.password);
-  
-      if (!isMatch) {
-        return res.status(400).json({ message: '비밀번호가 일치하지 않습니다.' });
-      }
-  
-      // 로그인 성공, 실패
-      res.json({ message: '로그인 성공' });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: '로그인 실패' });
-    }
-  });
-
-
 
 // 글쓰기
 app.post("/post", async(req,res) => {
