@@ -13,6 +13,7 @@ const upload = multer({ dest: 'uploads/' });
 // JWT 비밀키를 환경변수에서 가져오기
 const SECRET_KEY = process.env.JWT_SECRET_KEY || 'default_secret_key';
 
+
 app.use(cors({
     origin: 'http://localhost:5173',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
