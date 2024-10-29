@@ -154,6 +154,34 @@ app.get("/posts/:id", async(req,res) => {
     }
 })
 
+// 게시글 수정
+app.put('/posts/:id', async(req, res) => {
+    const { id } = req.params;
+    const { title, content, category, images } = req.body;
+
+    try {
+        const editPost = await Post.findByIdAndUpdate(
+            id,
+            { title, content, category, images },
+            { new: true }
+        );
+        res.json({ message: 'Post edited' });
+    } catch (err) {
+        res.status(500).json({ message: 'Edit failed' });
+    }
+})
+
+// 게시글 삭제
+app.delete('/posts/:id', async(req, res) => {
+    const { id } = req.params;
+    try {
+        const delPost = await Post.findByIdAndDelete(id);
+        res.json({ message: 'Post deleted' });
+    } catch (err) {
+        res.status(500).json({ message: 'Delete failed' });
+    }
+})
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}.`);
