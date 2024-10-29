@@ -2,9 +2,16 @@ const express = require('express')
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
-const app = express();
 const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });  
+const dotenv = require('dotenv');
+const jwt = require('jsonwebtoken');
+
+dotenv.config({path: '../.env'});
+const app = express();
+const upload = multer({ dest: 'uploads/' }); 
+
+// JWT 비밀키를 환경변수에서 가져오기
+const SECRET_KEY = process.env.JWT_SECRET_KEY || 'default_secret_key';
 
 app.use(cors({
     origin: 'http://localhost:5173',
@@ -26,9 +33,10 @@ app.get("/", (req, res) => {
     res.json({ message: "connected" })
 })
 
+
 // 회원가입 라우트
 app.post('/register', upload.single('userImage'), async (req, res) => {
-    const { account, password, userName, commentedArticles } = req.body;
+    const { type, account, password, userName, commentedArticles } = req.body;
     const userImage = req.file;
   
   
@@ -52,6 +60,7 @@ app.post('/register', upload.single('userImage'), async (req, res) => {
       
       // 새로운 유저 생성
       const newUser = new User({
+        type,
         account,
         password: hashedPassword, // 비밀번호 암호화
         userName,
@@ -85,19 +94,24 @@ app.post('/login', async (req, res) => {
   
       // 비밀번호 비교
       const isMatch = await bcrypt.compare(password, user.password);
-  
       if (!isMatch) {
         return res.status(400).json({ message: '비밀번호가 일치하지 않습니다.' });
       }
+
+      // 비밀번호가 일치하면 JWT 토큰 발급
+      const token = jwt.sign(
+        { id: user._id, account: user.account }, // 토큰에 포함할 사용자 정보 (Payload)
+        SECRET_KEY,                             // 비밀키를 사용해 서명
+        { expiresIn: '1h' }                     // 토큰 유효기간 (1시간)
+      );
   
       // 로그인 성공, 실패
-      res.json({ message: '로그인 성공' });
+      res.json({ message: '로그인 성공', token });
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: '로그인 실패' });
     }
   });
-
 
 
 // 글쓰기
