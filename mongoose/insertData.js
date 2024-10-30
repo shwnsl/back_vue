@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 const Post = require('./postModel'); 
 const postData = require("../../NFE1-2-3-fillog/src/datas/postData.json");
 
+// 해당 파일 실행시 임시 포스트데이터 DB에 저장됨
+
 mongoose.connect('mongodb://localhost:27017')
 .then(() => {
     console.log("MongoDB 연결 성공");

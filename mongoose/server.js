@@ -13,6 +13,7 @@ const upload = multer({ dest: 'uploads/' });
 // JWT 비밀키를 환경변수에서 가져오기
 const SECRET_KEY = process.env.JWT_SECRET_KEY || 'default_secret_key';
 
+
 app.use(cors({
     origin: 'http://localhost:5173',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -219,6 +220,34 @@ app.delete('/posts/:id', async(req, res) => {
         res.status(500).json({ message: 'Delete failed' });
     }
 })
+
+// // 게시글 수정
+// app.put('/posts/:id', async(req, res) => {
+//     const { id } = req.params;
+//     const { title, content, category, images } = req.body;
+
+//     try {
+//         const editPost = await Post.findByIdAndUpdate(
+//             id,
+//             { title, content, category, images },
+//             { new: true }
+//         );
+//         res.json({ message: 'Post edited' });
+//     } catch (err) {
+//         res.status(500).json({ message: 'Edit failed' });
+//     }
+// })
+
+// // 게시글 삭제
+// app.delete('/posts/:id', async(req, res) => {
+//     const { id } = req.params;
+//     try {
+//         const delPost = await Post.findByIdAndDelete(id);
+//         res.json({ message: 'Post deleted' });
+//     } catch (err) {
+//         res.status(500).json({ message: 'Delete failed' });
+//     }
+// })
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
