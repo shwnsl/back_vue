@@ -23,6 +23,7 @@ app.use(cors({
 // body-parser에 요청 본문 크기 제한 설정
 app.use(bodyParser.json({ limit: '10mb' })); // 10MB로 설정
 app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
+app.use('/uploads', express.static('uploads'));
 
 const db = require("./model");
 const Post = require('./postModel');
@@ -114,6 +115,38 @@ app.post('/login', async (req, res) => {
   });
 
 
+// 토큰 검증 미들웨어
+  const tokenMiddleware = async (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return res.sendStatus(401); // 토큰이 없을 경우
+
+    jwt.verify(token, SECRET_KEY, async (err, decoded) => {
+        if (err) return res.sendStatus(403); // 토큰이 유효하지 않을 경우
+      try{
+         // 토큰에 포함된 사용자 ID를 이용하여 DB에서 사용자 정보 조회
+          const user = await User.findById(decoded.id);
+         if (!user) return res.sendStatus(404); // 사용자를 찾을 수 없을 경우
+         req.user = user; // 요청 객체에 사용자 정보 추가
+          next();
+      } catch {
+        res.status(500).json({ message: '서버 오류 발생' });
+      }     
+    });
+  };
+
+ // 토큰을 이용해 사용자 정보 가져오기
+  app.get('/profile', tokenMiddleware, async (req, res) => {
+    try {
+        res.json(req.user);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: '사용자 정보 조회 실패' });
+    }
+});
+
+
 // 글쓰기
 app.post("/post", async(req,res) => {
     const { title, content, category, images } = req.body;
@@ -154,35 +187,36 @@ app.get("/posts/:id", async(req,res) => {
     }
 })
 
-// 게시글 수정
-app.put('/posts/:id', async(req, res) => {
-    const { id } = req.params;
-    const { title, content, category, images } = req.body;
 
-    try {
-        const editPost = await Post.findByIdAndUpdate(
-            id,
-            { title, content, category, images },
-            { new: true }
-        );
-        res.json({ message: 'Post edited' });
-    } catch (err) {
-        res.status(500).json({ message: 'Edit failed' });
-    }
-})
 
-// 게시글 삭제
-app.delete('/posts/:id', async(req, res) => {
-    const { id } = req.params;
-    try {
-        const delPost = await Post.findByIdAndDelete(id);
-        res.json({ message: 'Post deleted' });
-    } catch (err) {
-        res.status(500).json({ message: 'Delete failed' });
-    }
-})
+
+app.get("/admin-info", async (req, res) => {
+  try {
+      // type이 "admin"인 첫 번째 사용자를 찾습니다.
+      const admin = await User.findOne({ type: "admin" });
+
+      if (!admin) {
+          return res.status(404).json({ message: "관리자를 찾을 수 없습니다." });
+      }
+
+      // 관리자 이름과 이미지 경로 반환
+      res.json({
+          adminImage: admin.userImage,
+          userName: admin.userName,
+          blogName: admin.blogName,
+          tags: admin.tags
+      });
+  } catch (error) {
+      console.error("관리자 정보 가져오기 실패(서버):", error);
+      res.status(500).json({ message: "서버 오류가 발생했습니다." });
+  }
+});
+
+
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}.`);
 });
+
