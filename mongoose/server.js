@@ -1,17 +1,23 @@
 const express = require('express')
+const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const multer = require('multer');
-const dotenv = require('dotenv');
-const jwt = require('jsonwebtoken');
-const db = require("./model");
-const Post = require('./postModel');
+
+const { ObjectId } = mongoose.Types;
+
+// --- 여기서부터 데이터 모델 등록 ---
+
+const db = require('./model');
 const User = require('./registerModel');
 const Users = require('./userModel');
-const mongoose = require('mongoose');
+const Post = require('./postModel');
+const Guestbook = require('./guestModel');
+const GuestbookReply = require('./guestReplyModel');
 const Follow = require('./followerModel');
-const { ObjectId } = mongoose.Types;
 
 dotenv.config({path: '../.env'});
 
@@ -20,7 +26,6 @@ const upload = multer({ dest: 'uploads/' });
 
 // JWT 비밀키를 환경변수에서 가져오기
 const SECRET_KEY = process.env.JWT_SECRET_KEY || 'default_secret_key';
-
 
 app.use(cors({
     origin: 'http://localhost:5173',
@@ -37,7 +42,7 @@ app.use('/uploads', express.static('uploads'));
 db.main();
 
 app.get('/', (req, res) => {
-    res.json({ message: "connected" })
+    res.json({ message: 'Connected!' })
 });
 
 // 회원가입 라우트
@@ -86,7 +91,6 @@ app.post('/register', upload.single('userImage'), async (req, res) => {
     }
 });
 
-
 // 로그인 라우트
 app.post('/login', async (req, res) => {
     try {
@@ -109,8 +113,8 @@ app.post('/login', async (req, res) => {
         // 비밀번호가 일치하면 JWT 토큰 발급
         const token = jwt.sign(
             { id: user._id, account: user.account }, // 토큰에 포함할 사용자 정보 (Payload)
-            SECRET_KEY,                             // 비밀키를 사용해 서명
-            { expiresIn: '1h' }                     // 토큰 유효기간 (1시간)
+            SECRET_KEY, // 비밀키를 사용해 서명
+            { expiresIn: '1h' } // 토큰 유효기간 (1시간)
         );
 
         // 로그인 성공, 실패
@@ -123,7 +127,7 @@ app.post('/login', async (req, res) => {
 
 
 // 토큰 검증 미들웨어
-  const tokenMiddleware = async (req, res, next) => {
+const tokenMiddleware = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
@@ -131,20 +135,21 @@ app.post('/login', async (req, res) => {
 
     jwt.verify(token, SECRET_KEY, async (err, decoded) => {
         if (err) return res.sendStatus(403); // 토큰이 유효하지 않을 경우
-      try{
-         // 토큰에 포함된 사용자 ID를 이용하여 DB에서 사용자 정보 조회
-          const user = await User.findById(decoded.id);
-         if (!user) return res.sendStatus(404); // 사용자를 찾을 수 없을 경우
-         req.user = user; // 요청 객체에 사용자 정보 추가
-          next();
-      } catch {
-        res.status(500).json({ message: '서버 오류 발생' });
-      }
+
+        try{
+            // 토큰에 포함된 사용자 ID를 이용하여 DB에서 사용자 정보 조회
+            const user = await User.findById(decoded.id);
+            if (!user) return res.sendStatus(404); // 사용자를 찾을 수 없을 경우
+            req.user = user; // 요청 객체에 사용자 정보 추가
+            next();
+        } catch(error) {
+            res.status(500).json({ message: '서버 오류 발생' });
+        }
     });
-  };
+};
 
  // 토큰을 이용해 사용자 정보 가져오기
-  app.get('/profile', tokenMiddleware, async (req, res) => {
+app.get('/profile', tokenMiddleware, async (req, res) => {
     try {
         res.json(req.user);
     } catch (err) {
@@ -152,7 +157,6 @@ app.post('/login', async (req, res) => {
         res.status(500).json({ message: '사용자 정보 조회 실패' });
     }
 });
-
 
 // 글쓰기
 app.post('/post', async (req, res) => {
@@ -179,38 +183,37 @@ app.get('/posts', async (req, res) => {
     try {
         const posts = await Post.find();
 
-        res.json(posts);
+        res.json(posts.sort((a, b) => { return b.createdAt - a.createdAt }));
     } catch(error) {
-        res.status(500).json({ message: 'failed bring posts' });
+        res.status(500).json({ message: 'Failed bring posts' });
     }
 });
 
 // 게시글 상세
-app.get('/posts/:id', async(req,res) => {
+app.get('/posts/:id', async(req, res) => {
     const { id } = req.params;
-    console.log('포스트 찾기')
+
     try {
-         const postId = parseInt(id);
-        const post = await Post.findOne({ id: id });
+        const post = await Post.findOne({ _id: id });
+
         if (!post) {
-          return res.status(404).json({ message: "포스트를 찾을 수 없음" });
+            return res.status(404).json({ message: "포스트를 찾을 수 없음" });
         }
-         console.log("찾은 포스트:", post);
+
         res.json(post);
-    } catch (err) {
-        res.status(500).json({ message: 'failed to find', error: err.message })
+    } catch(error) {
+        res.status(500).json({ message: 'failed to find', error: error.message });
     }
 })
 
 // 게시글 좋아요
-app.post("/posts/:postId/like", async (req, res) => {
+app.post('/posts/:postId/like', async (req, res) => {
     const { postId } = req.params;
     const { userId } = req.body
-    console.log("요청 params:", req.params);
-    console.log("요청 body:", req.body);
+
     try {
         // db에서 포스트 찾기
-        const post = await Post.findOne({ id: postId });
+        const post = await Post.findOne({ _id: postId });
         if (!post) {
             return res.status(404).json({message : "포스트를 찾을 수 없습니다."})
         }
@@ -225,7 +228,7 @@ app.post("/posts/:postId/like", async (req, res) => {
             await post.save();  // db 변경 사항 저장
             return res.json({ message: '좋아요 취소 성공', likes: post.likes });
         }
-    } catch (error) {
+    } catch(error) {
         console.error(error);
         res.status(500).json({message: '좋아요 중 오류 발생'})
     }
@@ -254,7 +257,7 @@ app.delete('/posts/:id', async(req, res) => {
     const { id } = req.params;
 
     try {
-        const delPost = await Post.findByIdAndDelete(id);
+        await Post.findByIdAndDelete(id);
 
         res.json({ message: 'Post deleted' });
     } catch(error) {
@@ -262,12 +265,30 @@ app.delete('/posts/:id', async(req, res) => {
     }
 });
 
-app.post('/guestbook/write', async (req, res) => { // 방명록 작성 (모델 만들어야 함)
-    const {} = req.body;
+app.get('/guestbooks', async (req, res) => {
+    try {
+        const guestbookList = await Guestbook.find();
+
+        res.json(guestbookList.sort((a, b) => { return b.writtenDate - a.writtenDate }));
+    } catch(error) {
+        res.status(500).json({ message: 'An error occurred' });
+    }
+});
+
+app.post('/guestbooks/write', async (req, res) => { // 방명록 작성
+    const { isUser, userID, userName, userImage, password, text } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     try {
         const newGuestbook = new Guestbook({
-
+            writtenUser: {
+                isUser,
+                userID,
+                userName,
+                userImage,
+                hashedPassword,
+            },
+            text
         });
 
         await newGuestbook.save();
@@ -278,78 +299,96 @@ app.post('/guestbook/write', async (req, res) => { // 방명록 작성 (모델 �
     }
 });
 
-// 유저 정보 가져오기
+app.post('/guestbooks/reply/:id', async (req, res) => { // 방명록 답글 작성 - 미완성
+    const {} = req.body;
+    const { id } = req.params;
+
+    try {
+        const targetGuestbook = Guestbook.findOne({ _id: id });
+        const newGuestbookReply = new GuestbookReply({});
+
+        await newGuestbookReply.save();
+
+        res.status(200).json({ message: 'Guestbook Reply Attached Successfully' });
+    } catch(error) {
+        res.status(500).json({ message: 'An error occurred' });
+    }
+});
+
+// 유저 목록 가져오기
 app.get('/users', async (req, res) => {
-  try {
-    const users = await Users.find();
-    res.json(users);
-  } catch (err) {
-      res.status(500).json({ message: 'failed bring users' })
-  }
-})
+    try {
+        const users = await Users.find();
+
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ message: 'failed bring users' })
+    }
+});
 
 // 팔로우 기능
 app.post('/users/:userId/follow', async (req, res) => {
-  const userID = req.body.userID;
-  const followerID = req.body.followerID;
+    const userID = req.body.userID;
+    const followerID = req.body.followerID;
 
-  Users.findByIdAndUpdate(userID, { $push: { followers: { follower: followerID } } }, { safe: true, upsert: true, new: true })
+    Users.findByIdAndUpdate(userID, { $push: { followers: { follower: followerID } } }, { safe: true, upsert: true, new: true })
     .then(result => {
-      return Follow.findByIdAndUpdate(
-        followerID,
-        { $push: { users: { user: userID } } },
-        { safe: true, upsert: true, new: true },
-      );
+        return Follow.findByIdAndUpdate(
+            followerID,
+            { $push: { users: { user: userID } } },
+            { safe: true, upsert: true, new: true },
+        );
     })
     .then(result => {
-      res.status(200).json(result);
+        res.status(200).json(result);
     })
     .catch(err => {
-      next(err);
+        next(err);
     });
 });
 
 // 언팔로우 기능
 app.post('/users/:userId/unfollow', async (req, res) => {
-  const userID = req.body.userID;
-  const followerID = req.body.followerID;
+    const userID = req.body.userID;
+    const followerID = req.body.followerID;
 
-  Users.findByIdAndUpdate(userID, { $pull: { followers: { follower: followerID } } }, { safe: true, upsert: true, new: true })
+    Users.findByIdAndUpdate(userID, { $pull: { followers: { follower: followerID } } }, { safe: true, upsert: true, new: true })
     .then(result => {
-      return Follow.findByIdAndUpdate(
-        followerID,
-        { $pull: { users: { user: userID } } },
-        { safe: true, upsert: true, new: true },
-      );
+        return Follow.findByIdAndUpdate(
+            followerID,
+            { $pull: { users: { user: userID } } },
+            { safe: true, upsert: true, new: true },
+        );
     })
     .then(result => {
-      res.status(200).json(result);
+        res.status(200).json(result);
     })
     .catch(err => {
-      next(err);
+        next(err);
     });
 });
 
-app.get("/admin-info", async (req, res) => {
-  try {
-      // type이 "admin"인 첫 번째 사용자를 찾습니다.
-      const admin = await User.findOne({ type: "admin" });
+app.get('/admin-info', async (req, res) => {
+    try {
+        // type이 "admin"인 첫 번째 사용자를 찾습니다.
+        const admin = await Users.findOne({ type: 'admin' });
 
-      if (!admin) {
-          return res.status(404).json({ message: "관리자를 찾을 수 없습니다." });
-      }
+        if (!admin) {
+            return res.status(404).json({ message: '관리자를 찾을 수 없습니다.' });
+        }
 
-      // 관리자 이름과 이미지 경로 반환
-      res.json({
-          adminImage: admin.userImage,
-          userName: admin.userName,
-          blogName: admin.blogName,
-          tags: admin.tags
-      });
-  } catch (error) {
-      console.error("관리자 정보 가져오기 실패(서버):", error);
-      res.status(500).json({ message: "서버 오류가 발생했습니다." });
-  }
+        // 관리자 이름과 이미지 경로 반환
+        res.json({
+            adminID: admin._id,
+            adminName: admin.userName,
+            adminImage: admin.userImage,
+            followers: admin.followers,
+            blogInfo: admin.blogSettings
+        });
+    } catch (error) {
+        console.error('관리자 정보 가져오기 실패(서버):', error);
+        res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+    }
 });
 
 const PORT = process.env.PORT || 3000;
