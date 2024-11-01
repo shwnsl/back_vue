@@ -12,7 +12,7 @@ const followSchema = new mongoose.Schema({
     followers: [
         {
             user: {
-                type: Number,
+                type: String,
                 ref: "Users",
             }
         }
