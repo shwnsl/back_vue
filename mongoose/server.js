@@ -34,12 +34,6 @@ app.use(bodyParser.json({ limit: '10mb' })); // 10MB로 설정
 app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 app.use('/uploads', express.static('uploads'));
 
-const db = require('./model');
-const Post = require('./postModel');
-const User = require('./registerModel');
-// const User = require('./userModel')
-const mongoose = require("mongoose");
-
 db.main();
 
 app.get('/', (req, res) => {
