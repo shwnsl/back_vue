@@ -5,6 +5,13 @@ const bcrypt = require('bcrypt');
 const multer = require('multer');
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
+const db = require("./model");
+const Post = require('./postModel');
+const User = require('./registerModel');
+const Users = require('./userModel');
+const mongoose = require('mongoose');
+const Follow = require('./followerModel');
+const { ObjectId } = mongoose.Types;
 
 dotenv.config({path: '../.env'});
 const app = express();
@@ -24,13 +31,14 @@ app.use(cors({
 // body-parser에 요청 본문 크기 제한 설정
 app.use(bodyParser.json({ limit: '10mb' })); // 10MB로 설정
 app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
-app.use(express.json());
+app.use('/uploads', express.static('uploads'));
 
 const db = require("./model");
 const Post = require('./postModel');
 const User = require('./registerModel');
 // const User = require('./userModel')
 const mongoose = require("mongoose");
+
 db.main();
 
 app.get("/", (req, res) => {
@@ -116,6 +124,38 @@ app.post('/login', async (req, res) => {
       res.status(500).json({ message: '로그인 실패' });
     }
   });
+
+
+// 토큰 검증 미들웨어
+  const tokenMiddleware = async (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return res.sendStatus(401); // 토큰이 없을 경우
+
+    jwt.verify(token, SECRET_KEY, async (err, decoded) => {
+        if (err) return res.sendStatus(403); // 토큰이 유효하지 않을 경우
+      try{
+         // 토큰에 포함된 사용자 ID를 이용하여 DB에서 사용자 정보 조회
+          const user = await User.findById(decoded.id);
+         if (!user) return res.sendStatus(404); // 사용자를 찾을 수 없을 경우
+         req.user = user; // 요청 객체에 사용자 정보 추가
+          next();
+      } catch {
+        res.status(500).json({ message: '서버 오류 발생' });
+      }     
+    });
+  };
+
+ // 토큰을 이용해 사용자 정보 가져오기
+  app.get('/profile', tokenMiddleware, async (req, res) => {
+    try {
+        res.json(req.user);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: '사용자 정보 조회 실패' });
+    }
+});
 
 
 // 글쓰기
@@ -273,8 +313,82 @@ app.post('/mypage/edit',async(req,res)=>{
     res.status(500).json({ message: '유저 정보 수정 실패', error });
   }
 })
+// 유저 정보 가져오기
+app.get('/users', async (req, res) => {
+  try {
+    const users = await Users.find();
+    res.json(users);
+  } catch (err) {
+      res.status(500).json({ message: 'failed bring users' })
+  }
+})
+
+// 팔로우 기능
+app.post('/users/:userId/follow', async (req, res) => {
+  const userID = req.body.userID;
+  const followerID = req.body.followerID;
+
+  Users.findByIdAndUpdate(userID, { $push: { followers: { follower: followerID } } }, { safe: true, upsert: true, new: true })
+    .then(result => {
+      return Follow.findByIdAndUpdate(
+        followerID,
+        { $push: { users: { user: userID } } },
+        { safe: true, upsert: true, new: true },
+      );
+    })
+    .then(result => {
+      res.status(200).json(result);
+    })
+    .catch(err => {
+      next(err);
+    });
+});
+
+// 언팔로우 기능
+app.post('/users/:userId/unfollow', async (req, res) => {
+  const userID = req.body.userID;
+  const followerID = req.body.followerID;
+
+  Users.findByIdAndUpdate(userID, { $pull: { followers: { follower: followerID } } }, { safe: true, upsert: true, new: true })
+    .then(result => {
+      return Follow.findByIdAndUpdate(
+        followerID,
+        { $pull: { users: { user: userID } } },
+        { safe: true, upsert: true, new: true },
+      );
+    })
+    .then(result => {
+      res.status(200).json(result);
+    })
+    .catch(err => {
+      next(err);
+    });
+});
+
+app.get("/admin-info", async (req, res) => {
+  try {
+      // type이 "admin"인 첫 번째 사용자를 찾습니다.
+      const admin = await User.findOne({ type: "admin" });
+
+      if (!admin) {
+          return res.status(404).json({ message: "관리자를 찾을 수 없습니다." });
+      }
+
+      // 관리자 이름과 이미지 경로 반환
+      res.json({
+          adminImage: admin.userImage,
+          userName: admin.userName,
+          blogName: admin.blogName,
+          tags: admin.tags
+      });
+  } catch (error) {
+      console.error("관리자 정보 가져오기 실패(서버):", error);
+      res.status(500).json({ message: "서버 오류가 발생했습니다." });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}.`);
 });
+
