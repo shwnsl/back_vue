@@ -5,6 +5,13 @@ const bcrypt = require('bcrypt');
 const multer = require('multer');
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
+const db = require("./model");
+const Post = require('./postModel');
+const User = require('./registerModel');
+const Users = require('./userModel');
+const mongoose = require('mongoose');
+const Follow = require('./followerModel');
+const { ObjectId } = mongoose.Types;
 
 dotenv.config({path: '../.env'});
 const app = express();
@@ -31,6 +38,7 @@ const Post = require('./postModel');
 const User = require('./registerModel');
 // const User = require('./userModel')
 const mongoose = require("mongoose");
+
 db.main();
 
 app.get("/", (req, res) => {
@@ -253,35 +261,57 @@ app.delete('/posts/:id', async(req, res) => {
     }
 })
 
-// // 게시글 수정
-// app.put('/posts/:id', async(req, res) => {
-//     const { id } = req.params;
-//     const { title, content, category, images } = req.body;
+// 유저 정보 가져오기
+app.get('/users', async (req, res) => {
+  try {
+    const users = await Users.find();
+    res.json(users);
+  } catch (err) {
+      res.status(500).json({ message: 'failed bring users' })
+  }
+})
 
-//     try {
-//         const editPost = await Post.findByIdAndUpdate(
-//             id,
-//             { title, content, category, images },
-//             { new: true }
-//         );
-//         res.json({ message: 'Post edited' });
-//     } catch (err) {
-//         res.status(500).json({ message: 'Edit failed' });
-//     }
-// })
+// 팔로우 기능
+app.post('/users/:userId/follow', async (req, res) => {
+  const userID = req.body.userID;
+  const followerID = req.body.followerID;
 
-// // 게시글 삭제
-// app.delete('/posts/:id', async(req, res) => {
-//     const { id } = req.params;
-//     try {
-//         const delPost = await Post.findByIdAndDelete(id);
-//         res.json({ message: 'Post deleted' });
-//     } catch (err) {
-//         res.status(500).json({ message: 'Delete failed' });
-//     }
-// })
+  Users.findByIdAndUpdate(userID, { $push: { followers: { follower: followerID } } }, { safe: true, upsert: true, new: true })
+    .then(result => {
+      return Follow.findByIdAndUpdate(
+        followerID,
+        { $push: { users: { user: userID } } },
+        { safe: true, upsert: true, new: true },
+      );
+    })
+    .then(result => {
+      res.status(200).json(result);
+    })
+    .catch(err => {
+      next(err);
+    });
+});
 
+// 언팔로우 기능
+app.post('/users/:userId/unfollow', async (req, res) => {
+  const userID = req.body.userID;
+  const followerID = req.body.followerID;
 
+  Users.findByIdAndUpdate(userID, { $pull: { followers: { follower: followerID } } }, { safe: true, upsert: true, new: true })
+    .then(result => {
+      return Follow.findByIdAndUpdate(
+        followerID,
+        { $pull: { users: { user: userID } } },
+        { safe: true, upsert: true, new: true },
+      );
+    })
+    .then(result => {
+      res.status(200).json(result);
+    })
+    .catch(err => {
+      next(err);
+    });
+});
 
 app.get("/admin-info", async (req, res) => {
   try {
@@ -304,9 +334,6 @@ app.get("/admin-info", async (req, res) => {
       res.status(500).json({ message: "서버 오류가 발생했습니다." });
   }
 });
-
-
-
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
