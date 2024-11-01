@@ -221,33 +221,58 @@ app.delete('/posts/:id', async(req, res) => {
     }
 })
 
-// // 게시글 수정
-// app.put('/posts/:id', async(req, res) => {
-//     const { id } = req.params;
-//     const { title, content, category, images } = req.body;
+// 마이페이지 
+app.post('/mypage', async(req,res) => {
+  console.log(req.body)
+  const { userAccount } = req.body;
+  try{
+    const findUser = await User.findOne({ account: userAccount });
+    console.log("Query result:", findUser);
+    if (!findUser) {
+      console.log('유저를 찾을 수 없습니다'); 
+      return res.status(404).json({ message: '유저를 찾을 수 없습니다' });
+    }
+    console.log('유저 데이터 찾기 성공')
+    
+    res.json({
+      _id: findUser._id,
+      account: findUser.account,
+      userName: findUser.userName,
+      userImage: findUser.userImage,
+      commentedArticles: findUser.commentedArticles,
+    })
+  } catch (error) {
+      console.error("Error details:", error);
+      res.status(500).json({ message: '유저 찾기 실패' });
+  }
+})
 
-//     try {
-//         const editPost = await Post.findByIdAndUpdate(
-//             id,
-//             { title, content, category, images },
-//             { new: true }
-//         );
-//         res.json({ message: 'Post edited' });
-//     } catch (err) {
-//         res.status(500).json({ message: 'Edit failed' });
-//     }
-// })
-
-// // 게시글 삭제
-// app.delete('/posts/:id', async(req, res) => {
-//     const { id } = req.params;
-//     try {
-//         const delPost = await Post.findByIdAndDelete(id);
-//         res.json({ message: 'Post deleted' });
-//     } catch (err) {
-//         res.status(500).json({ message: 'Delete failed' });
-//     }
-// })
+// 내 정보 수정
+app.post('/mypage/edit',async(req,res)=>{
+  console.log(req.body);
+  const {_id,userName,userImage,account} = req.body;
+  try{
+    const updatedUser = await User.findOneAndUpdate( 
+      { _id: _id },
+      { userName, userImage, account },
+      { new: true });
+    console.log('DB에서 찾은 결과: ', updatedUser)
+    if (!updatedUser) {
+      console.log('유저를 찾을 수 없습니다'); 
+      return res.status(404).json({ message: '유저를 찾을 수 없습니다' });
+    }
+    console.log('유저 데이터 찾기 성공')
+    res.json({
+      _id: updatedUser._id,
+      account: updatedUser.account,
+      userName: updatedUser.userName,
+      userImage: updatedUser.userImage,
+      commentedArticles: updatedUser.commentedArticles,
+    })
+  }catch (error){
+    res.status(500).json({ message: '유저 정보 수정 실패', error });
+  }
+})
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
