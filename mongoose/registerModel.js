@@ -23,8 +23,13 @@ const userSchema = new mongoose.Schema({
     type: Date, 
     default: Date.now 
   },
-  blogName: { type: String }, // blogName 필드 추가
-  tags: [{ type: String }]    // tags 필드 추가 (배열 형태)
+  blogName: { 
+    type: String,
+    require: false}, // blogName 필드 추가
+  tags: [{ 
+    type: String,
+    required: false
+   }]    // tags 필드 추가 (배열 형태)
 });
 
 module.exports = mongoose.model('Register', userSchema);
