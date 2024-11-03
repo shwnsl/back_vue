@@ -41,6 +41,7 @@ app.use(bodyParser.json({ limit: '10mb' })); // 10MB로 설정
 app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 app.use('/uploads', express.static('uploads'));
 
+
 db.main();
 
 app.get('/', (req, res) => {
