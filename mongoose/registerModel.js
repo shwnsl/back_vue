@@ -18,7 +18,8 @@ const userSchema = new mongoose.Schema({
         required: true
     },
     userImage: { type: String },
-    commentedArticles: [ String ],
+    commentedArticles: [ String ], // 댓글 작성한 게시물의 _id 배열
+    likedArticles: [ String ], // 좋아요 한 게시물의 _id 배열
     dateCreated: {
         type: Date,
         default: Date.now

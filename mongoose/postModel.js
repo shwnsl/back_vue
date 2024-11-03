@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 
 const postSchema = new mongoose.Schema({
-    id: { type: Number, required: true, unique: true },
     title: { type: String, required: true },
     thumbIndex: { type: Number, required: true },
     category: { type: String, required: true },
@@ -17,23 +16,13 @@ const postSchema = new mongoose.Schema({
         ],
         required: false,
     },
-    comments: [
-        {
-            id: { type: Number, required: true },
-            userId: { type: Number, required: true },
-            commentText: { type: String, required: true },
-            date: { type: String, required: true },
-            time: { type: String, required: true },
-        },
-    ],
-    likes: [{ type: Number }],
-    author: { type: Object, required: true },
-    date: { type: String, required: true },
-    time: { type: String, required: true },
+    comments: [ String ], // replies의 _id 배열
+    likes: [ String ], // users의 _id 배열 (users가 liked한 배열에도 마찬가지로 해당 글의 _id를 추가해야 함)
+    author: { type: String, required: true }, // users의 _id
     createdAt: {
         type: Date,
-        default: Date.now,
-    },
+        default: Date.now
+    }
 });
 
 module.exports = mongoose.model('Post', postSchema);

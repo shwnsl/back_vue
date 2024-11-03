@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const guestbookReplySchema = new mongoose.Schema({
     replyUserID: String,
     replyText: String,
-    replyDate: {
+    createdAt: {
         type: Date,
         default: Date.now
     }
