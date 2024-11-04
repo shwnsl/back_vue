@@ -271,6 +271,16 @@ app.delete('/posts/:id', async(req, res) => {
     }
 });
 
+app.get('/replies/:id', async (req, res) => { // 댓글 가져오기
+    try {
+        const replies = await Reply.findById(req.params.id); // 포스트에서 아이디 가져오기
+
+        res.json(replies);
+    } catch(error) {
+        res.status(500).json({ message: 'An error occurred' });
+    }
+});
+
 app.post('/reply', async (req, res) => { // 댓글 작성 (진행중)
     const {  } = req.body;
 
@@ -285,16 +295,6 @@ app.post('/reply', async (req, res) => { // 댓글 작성 (진행중)
     } catch(error) {
         console.error(error);
         res.status(500).json({ message: 'Reply failed' });
-    }
-});
-
-app.get('/re-replies', async (req, res) => { // 대댓글 가져오기
-    try {
-        const reReplies = await Reply.find({ replyTarget: { target: 'reply', targetID: req.params.id } });
-
-        res.json(reReplies);
-    } catch(error) {
-        res.status(500).json({ message: 'An error occurred' });
     }
 });
 
@@ -320,26 +320,6 @@ app.get('/replies/post/:id', async (req, res) => { // 포스트에 해당되는 
         const replies = await Reply.find({ repliedArticle: req.params.id });
 
         res.json(replies);
-    } catch(error) {
-        res.status(500).json({ message: 'An error occurred' });
-    }
-});
-
-app.get('/replies/:id', async (req, res) => { // 댓글 가져오기
-    try {
-        const replies = await Reply.findById(req.params.id); // 포스트에서 아이디 가져오기
-
-        res.json(replies);
-    } catch(error) {
-        res.status(500).json({ message: 'An error occurred' });
-    }
-});
-
-app.get('/re-replies/:id', async (req, res) => { // 대댓글 가져오기
-    try {
-        const reReplies = await ReReply.findById(req.body.reReplyID);
-
-        res.json(reReplies.sort((a, b) => { return b.createdAt - a.createdAt }));
     } catch(error) {
         res.status(500).json({ message: 'An error occurred' });
     }
