@@ -1,17 +1,16 @@
 const mongoose = require('mongoose');
 
 const replySchema = new mongoose.Schema({
-    replyTarget: String, // 'article', 'reply'로 구분
+    repliedArticle: String, // 이 댓글이 소속된 포스트의 _id
+    replyTarget: { // 댓글 대상
+        target: String, // 'article', 'reply'
+        targetID: String // 대상의 _id
+    },
     userID: String,
     userName: String,
     password: String,
     replyText: String,
-    reReply: [
-        {
-            type: Object,
-            ref: 'ReReply'
-        }
-    ],
+    reReplies: [ String ],
     createdAt: {
         type: Date,
         default: Date.now

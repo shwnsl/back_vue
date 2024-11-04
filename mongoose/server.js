@@ -16,7 +16,6 @@ const User = require('./registerModel');
 const Users = require('./userModel');
 const Post = require('./postModel');
 const Reply = require('./replyModel');
-const ReReply = require('./reReplyModel');
 const Guestbook = require('./guestModel');
 const GuestbookReply = require('./guestReplyModel');
 const Follow = require('./followerModel');
@@ -163,17 +162,21 @@ app.get('/profile', tokenMiddleware, async (req, res) => {
 
 // 글쓰기
 app.post('/post', async (req, res) => {
-    const { title, content, category, images } = req.body;
+    const { title, category, movieID, text, images, author } = req.body;
 
     try {
         const newPost = new Post({
             title,
-            content,
-            category,
-            images
+            thumbIndex: images.length === 0 ? null : 0,
+            category: Number(category),
+            movieID,
+            text,
+            images,
+            author
         });
 
         await newPost.save();
+
         res.status(200).json({ message: 'Post saved Successgully' });
     } catch(error) {
         console.error(error);
@@ -285,6 +288,16 @@ app.post('/reply', async (req, res) => { // 댓글 작성 (진행중)
     }
 });
 
+app.get('/re-replies', async (req, res) => { // 대댓글 가져오기
+    try {
+        const reReplies = await Reply.find({ replyTarget: { target: 'reply', targetID: req.params.id } });
+
+        res.json(reReplies);
+    } catch(error) {
+        res.status(500).json({ message: 'An error occurred' });
+    }
+});
+
 app.post('/re-reply', async (req, res) => { // 대댓글 작성 (진행중)
     const {  } = req.body;
 
@@ -299,6 +312,16 @@ app.post('/re-reply', async (req, res) => { // 대댓글 작성 (진행중)
     } catch(error) {
         console.error(error);
         res.status(500).json({ message: 'Reply failed' });
+    }
+});
+
+app.get('/replies/post/:id', async (req, res) => { // 포스트에 해당되는 댓글 가져오기
+    try {
+        const replies = await Reply.find({ repliedArticle: req.params.id });
+
+        res.json(replies);
+    } catch(error) {
+        res.status(500).json({ message: 'An error occurred' });
     }
 });
 
@@ -326,7 +349,7 @@ app.get('/guestbooks', async (req, res) => { // 방명록 가져오기
     try {
         const guestbookList = await Guestbook.find();
 
-        res.json(guestbookList.sort((a, b) => { return b.writtenDate - a.writtenDate }));
+        res.json(guestbookList.sort((a, b) => { return b.createdAt - a.createdAt }));
     } catch(error) {
         res.status(500).json({ message: 'An error occurred' });
     }
@@ -356,16 +379,34 @@ app.post('/guestbooks/write', async (req, res) => { // 방명록 작성
     }
 });
 
-app.post('/guestbooks/reply/:id', async (req, res) => { // 방명록 답글 작성 - 미완성
-    const {} = req.body;
-
+app.delete('/guestbooks/:id', async (req, res) => { // 방명록 글 삭제
     try {
-        const targetGuestbook = Guestbook.findById(req.params.id);
-        const newGuestbookReply = new GuestbookReply({});
+        await Guestbook.findByIdAndDelete(req.params.id);
+
+        res.status(200).json({ message: 'Guestbook Removed Successfully' });
+    } catch(error) {
+        res.status(500).json({ message: 'An error occurred' });
+    }
+});
+
+app.post('/guestbooks/reply/:id', async (req, res) => { // 방명록 답글 작성 - 미완성
+    try {
+        const newGuestbookReply = new GuestbookReply(req.body);
+        const targetGuestbook = Guestbook.findByIdAndUpdate(req.params.id, targetGuestbook.replies.push(newGuestbookReply._id));
 
         await newGuestbookReply.save();
 
         res.status(200).json({ message: 'Guestbook Reply Attached Successfully' });
+    } catch(error) {
+        res.status(500).json({ message: 'An error occurred' });
+    }
+});
+
+app.get('/guestbooks/replies/:id', async (req, res) => { // 방명록 글의 전체 답글 가져오기
+    try {
+        const replies = await GuestbookReply.find({ targetGuestbook: req.params.id });
+
+        res.json(replies);
     } catch(error) {
         res.status(500).json({ message: 'An error occurred' });
     }
