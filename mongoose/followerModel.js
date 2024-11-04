@@ -1,10 +1,6 @@
 const mongoose = require('mongoose');
 
 const followSchema = new mongoose.Schema({
-    id: {
-        type: Number,
-        required: true,
-    },
     userName: {
         type: String,
         required: true,
@@ -13,7 +9,7 @@ const followSchema = new mongoose.Schema({
         {
             user: {
                 type: Number,
-                ref: "Users",
+                ref: 'Users',
             }
         }
     ]

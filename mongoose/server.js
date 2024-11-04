@@ -15,6 +15,8 @@ const db = require('./model');
 const User = require('./registerModel');
 const Users = require('./userModel');
 const Post = require('./postModel');
+const Reply = require('./replyModel');
+const ReReply = require('./reReplyModel');
 const Guestbook = require('./guestModel');
 const GuestbookReply = require('./guestReplyModel');
 const Follow = require('./followerModel');
@@ -266,7 +268,61 @@ app.delete('/posts/:id', async(req, res) => {
     }
 });
 
-app.get('/guestbooks', async (req, res) => {
+app.post('/reply', async (req, res) => { // 댓글 작성 (진행중)
+    const {  } = req.body;
+
+    try {
+        const newReply = new Reply({  });
+        const replyTarget = Post.findById() // 대상 게시물 찾기
+
+        await newReply.save(); // 댓글 저장
+        await replyTarget.findByIdAndUpdate(); // 대상 게시물의 댓글 배열에 작성된 댓글의 ID 업데이트
+
+        res.status(200).json({ message: 'Reply saved Successgully' });
+    } catch(error) {
+        console.error(error);
+        res.status(500).json({ message: 'Reply failed' });
+    }
+});
+
+app.post('/re-reply', async (req, res) => { // 대댓글 작성 (진행중)
+    const {  } = req.body;
+
+    try {
+        const newReply = new Reply({  });
+        const replyTarget = Reply.findById() // 대상 댓글 찾기
+
+        await newReply.save(); // 댓글 저장
+        await replyTarget.findByIdAndUpdate(); // 대상 댓글의 댓글 배열에 작성된 댓글의 ID 업데이트
+
+        res.status(200).json({ message: 'Reply saved Successgully' });
+    } catch(error) {
+        console.error(error);
+        res.status(500).json({ message: 'Reply failed' });
+    }
+});
+
+app.get('/replies/:id', async (req, res) => { // 댓글 가져오기
+    try {
+        const replies = await Reply.findById(req.params.id); // 포스트에서 아이디 가져오기
+
+        res.json(replies);
+    } catch(error) {
+        res.status(500).json({ message: 'An error occurred' });
+    }
+});
+
+app.get('/re-replies/:id', async (req, res) => { // 대댓글 가져오기
+    try {
+        const reReplies = await ReReply.findById(req.body.reReplyID);
+
+        res.json(reReplies.sort((a, b) => { return b.createdAt - a.createdAt }));
+    } catch(error) {
+        res.status(500).json({ message: 'An error occurred' });
+    }
+});
+
+app.get('/guestbooks', async (req, res) => { // 방명록 가져오기
     try {
         const guestbookList = await Guestbook.find();
 
@@ -302,10 +358,9 @@ app.post('/guestbooks/write', async (req, res) => { // 방명록 작성
 
 app.post('/guestbooks/reply/:id', async (req, res) => { // 방명록 답글 작성 - 미완성
     const {} = req.body;
-    const { id } = req.params;
 
     try {
-        const targetGuestbook = Guestbook.findOne({ _id: id });
+        const targetGuestbook = Guestbook.findById(req.params.id);
         const newGuestbookReply = new GuestbookReply({});
 
         await newGuestbookReply.save();
@@ -316,7 +371,7 @@ app.post('/guestbooks/reply/:id', async (req, res) => { // 방명록 답글 작�
     }
 });
 
-// 마이페이지 
+// 마이페이지
 app.post('/mypage', async(req,res) => {
   console.log(req.body)
   const { userAccount } = req.body;
@@ -324,11 +379,11 @@ app.post('/mypage', async(req,res) => {
     const findUser = await User.findOne({ account: userAccount });
     console.log("Query result:", findUser);
     if (!findUser) {
-      console.log('유저를 찾을 수 없습니다'); 
+      console.log('유저를 찾을 수 없습니다');
       return res.status(404).json({ message: '유저를 찾을 수 없습니다' });
     }
     console.log('유저 데이터 찾기 성공')
-    
+
     res.json({
       _id: findUser._id,
       account: findUser.account,
@@ -347,13 +402,13 @@ app.post('/mypage/edit',async(req,res)=>{
   console.log(req.body);
   const {_id,userName,userImage,account} = req.body;
   try{
-    const updatedUser = await User.findOneAndUpdate( 
+    const updatedUser = await User.findOneAndUpdate(
       { _id: _id },
       { userName, userImage, account },
       { new: true });
     console.log('DB에서 찾은 결과: ', updatedUser)
     if (!updatedUser) {
-      console.log('유저를 찾을 수 없습니다'); 
+      console.log('유저를 찾을 수 없습니다');
       return res.status(404).json({ message: '유저를 찾을 수 없습니다' });
     }
     console.log('유저 데이터 찾기 성공')
@@ -369,8 +424,7 @@ app.post('/mypage/edit',async(req,res)=>{
   }
 })
 
-// 유저 정보 가져오기
-app.get('/users', async (req, res) => {
+app.get('/users', async (req, res) => { // 전체 사용자 목록 가져오기
     try {
         const users = await Users.find();
 
@@ -379,6 +433,16 @@ app.get('/users', async (req, res) => {
         res.status(500).json({ message: 'failed bring users' })
     }
 });
+
+app.get('/user-info/:id', async (req, res) => { // 개별 사용자 정보 가져오기
+    try {
+        const user = await Users.findById(req.params.id);
+
+        res.json(user);
+    } catch(error) {
+        res.status(500).json({ message: 'Failed bring user' });
+    }
+})
 
 // 팔로우 기능
 app.post('/users/:userId/follow', async (req, res) => {
