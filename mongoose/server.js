@@ -96,17 +96,17 @@ app.post('/register', upload.single('userImage'), async (req, res) => {
 // 로그인 라우트
 app.post('/login', async (req, res) => {
     try {
-        const { account, password } = req.body;
+        const { userAccount, userPassword } = req.body;
 
         // 유저 찾기
-        const user = await User.findOne({ account });
+        const user = await Users.findOne({ account: userAccount });
 
         if (!user) {
             return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
         }
 
         // 비밀번호 비교
-        const isMatch = await bcrypt.compare(password, user.password);
+        const isMatch = await bcrypt.compare(userPassword, user.password);
 
         if (!isMatch) {
             return res.status(400).json({ message: '비밀번호가 일치하지 않습니다.' });
@@ -114,7 +114,7 @@ app.post('/login', async (req, res) => {
 
         // 비밀번호가 일치하면 JWT 토큰 발급
         const token = jwt.sign(
-            { id: user._id, account: user.account }, // 토큰에 포함할 사용자 정보 (Payload)
+            { id: user._id, account: user.userAccount }, // 토큰에 포함할 사용자 정보 (Payload)
             SECRET_KEY, // 비밀키를 사용해 서명
             { expiresIn: '1h' } // 토큰 유효기간 (1시간)
         );
