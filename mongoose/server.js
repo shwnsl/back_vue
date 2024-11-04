@@ -113,6 +113,11 @@ app.post('/login', async (req, res) => {
             return res.status(400).json({ message: '비밀번호가 일치하지 않습니다.' });
         }
 
+        const users = await Users.findOne({ account });
+        if (!user) {
+            return res.status(404).json({ message: '사용자 정보가 일치하지 않습니다.' });
+        }
+
         // 비밀번호가 일치하면 JWT 토큰 발급
         const token = jwt.sign(
             { id: user._id, account: user.account }, // 토큰에 포함할 사용자 정보 (Payload)
@@ -121,7 +126,7 @@ app.post('/login', async (req, res) => {
         );
 
         // 로그인 성공, 실패
-        res.json({ message: '로그인 성공', token });
+        res.json({ message: '로그인 성공', token, userId: users._id, userName: users.userName });
     } catch(error) {
         console.error(error);
         res.status(500).json({ message: '로그인 실패' });
@@ -211,7 +216,7 @@ app.get('/posts/:id', async(req, res) => {
 
 // 게시글 좋아요
 app.post('/posts/:postId/like', async (req, res) => {
-    const { postId } = req.params;
+    const postId = req.params.postId;
     const { userId } = req.body
 
     try {
@@ -220,20 +225,147 @@ app.post('/posts/:postId/like', async (req, res) => {
         if (!post) {
             return res.status(404).json({message : "포스트를 찾을 수 없습니다."})
         }
+        // 유저를 userModel DB에서 찾기
+        const user = await Users.findOne({ _id: userId });
+        if (!user) {
+            return res.status(404).json({ message: "유저를 찾을 수 없습니다." });
+        }
+
+        // likedArticles가 존재하지 않으면 생성
+        if (!user.likedArticles) {
+            user.likedArticles = []; // 빈 배열로 초기화
+        }
         // 이미 좋아요를 눌렀는지 확인
-        if (!post.likes.includes(userId)) {
-            post.likes.push(userId) // id를 좋아요 배열에 추가
+        const alreadyLiked = user.likedArticles.includes(postId);
+        
+        if (!alreadyLiked) {
+            post.likes += 1; // id를 좋아요 배열에 추가
+            user.likedArticles.push(postId); // 유저의 likedArticles에 포스트 ID 추가
             await post.save();  // db 변경 사항 저장
+            await user.save(); // 유저의 likedArticles 저장
             return res.json({message: '좋아요 추가 성공', post})
         } else {
             // 좋아요 취소
-            post.likes = post.likes.filter(like => like !== userId); // 좋아요 제거
+            post.likes -= 1;
+            user.likedArticles = user.likedArticles.filter(id => id !== postId); // 유저의 likedArticles에서 포스트 ID 제거
             await post.save();  // db 변경 사항 저장
+            await user.save(); // 유저의 likedArticles 저장
             return res.json({ message: '좋아요 취소 성공', likes: post.likes });
         }
     } catch(error) {
         console.error(error);
         res.status(500).json({message: '좋아요 중 오류 발생'})
+    }
+});
+
+// 게시글 댓글 가져오기
+app.get('/posts/:postID/comments', async (req, res) => {
+    const {postID} = req.params;
+    console.log("postID: ", postID)
+    try {
+        const post = await Post.findOne({ id: postID });
+        if (!post) {
+            return res.status(404).json({ message: "포스트를 찾을 수 없습니다." });
+        }
+
+        return res.json(post.comments); // 댓글 배열 반환
+    } catch (error) {
+        console.error('댓글 가져오기 중 오류:', error.message);
+        console.log("postID: ", postID)
+        res.status(500).json({ message: '댓글 가져오기 중 오류가 발생했습니다.' });
+    }
+});
+
+// 게시글 댓글 추가
+app.post('/posts/:postObjId/comment', async (req, res) => {
+    const postObjId = req.params.postObjId;
+    console.log("postObjId: ", postObjId)
+    const { userId, commentText, postId } = req.body;
+
+    try {
+        // db에서 포스트 찾기
+        const post = await Post.findOne({  _id: postObjId });
+        if (!post) {
+            return res.status(404).json({ message: "포스트를 찾을 수 없습니다." }); 
+        }
+
+        // 유저를 userModel DB에서 찾기
+        const user = await Users.findOne({ account: userId });
+        if (!user) {
+            return res.status(404).json({ message: "유저를 찾을 수 없습니다." });
+        }
+
+        // commentedArticles가 존재하지 않으면 생성
+        if (!user.commentedArticles) {
+            user.commentedArticles = []; // 빈 배열로 초기화
+        }
+
+        // 새로운 댓글을 위한 고유 ID 생성
+        const newCommentId = post.comments.reduce((maxId, comment) => {
+            return Math.max(maxId, comment.id || 0); 
+        }, 0) + 1;  // 마지막 댓글 ID에서 증가
+
+        // 댓글 객체 생성
+        const newComment = {
+            id: post.comments.length + 1,
+            userId: user._id,
+            commentText,
+            date: new Date().toISOString().split('T')[0], // 현재 날짜를 YYYY-MM-DD 형식으로 가져오기
+            time: new Date().toISOString().split('T')[1].split('.')[0], // 현재 시간을 HH:mm:ss 형식으로 가져오기
+        };
+        post.comments.push(newComment); // 포스트의 댓글 배열에 댓글 추가
+
+        // 사용자가 이 포스트에 대한 첫 댓글이라면 userModel의 commentedArticles에 postId 추가
+        if (!user.commentedArticles.includes(postId)) {
+            user.commentedArticles.push(postId);
+        }
+
+        // 포스트와 사용자 모두 변경 사항 저장
+        await post.save();
+        await user.save();
+
+        return res.json({ message: '댓글이 추가되었습니다.', comment: newComment }); 
+    } catch (error) {
+        console.error('댓글 추가 중 오류:', error.message);
+        res.status(500).json({ message: '댓글 추가 중 오류가 발생했습니다.' }); 
+    }
+});
+
+// 게시글 댓글 삭제
+app.delete('/posts/:postId/comment/:commentId', async (req, res) => {
+    const postId = Number(req.params.postId);
+    const commentId = Number(req.params.commentId);
+    
+    try {
+        // db에서 포스트 찾기
+        const post = await Post.findOne({ id: postId });
+        if (!post) {
+            return res.status(404).json({ message: "포스트를 찾을 수 없습니다." }); 
+        }
+
+        // 댓글이 포스트에 존재하는지 확인
+        const commentIndex = post.comments.findIndex(comment => comment.id === commentId);
+        if (commentIndex === -1) {
+            return res.status(404).json({ message: "댓글을 찾을 수 없습니다." }); 
+        }
+
+        // 댓글 삭제
+        post.comments.splice(commentIndex, 1); 
+
+        // 사용자의 commentedArticles에서 해당 포스트 ID 삭제
+        const user = await Users.findOne({ "commentedArticles": postId });
+        if (user) {
+            user.commentedArticles = user.commentedArticles.filter(id => id !== postId); 
+            await user.save(); // 변경 사항 저장
+        }
+
+        // 포스트 변경 사항 저장
+        await post.save();
+
+        return res.json({ message: '댓글이 삭제되었습니다.', post }); 
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: '댓글 삭제 중 오류가 발생했습니다.' }); 
     }
 });
 

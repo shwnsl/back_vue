@@ -6,6 +6,7 @@ const postSchema = new mongoose.Schema({
     category: { type: String, required: true },
     movieID: { type: Number, required: false },
     text: { type: String, required: true },
+    movieGenres: [Number],
     images: {
         type: [
             {

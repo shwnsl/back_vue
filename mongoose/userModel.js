@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
     },
     userImage: { type: String },
     commentedArticles: [ Number ],
-    likedArticles: [ Number ],
+    likedArticles: [ String ],
     followers: [
         {
             follow: {
