@@ -220,12 +220,11 @@ app.post('/posts/:postId/like', async (req, res) => {
     const { userId } = req.body
 
     try {
-        // db에서 포스트 찾기
         const post = await Post.findOne({ _id: postId });
         if (!post) {
             return res.status(404).json({message : "포스트를 찾을 수 없습니다."})
         }
-        // 유저를 userModel DB에서 찾기
+
         const user = await Users.findOne({ _id: userId });
         if (!user) {
             return res.status(404).json({ message: "유저를 찾을 수 없습니다." });
@@ -233,23 +232,22 @@ app.post('/posts/:postId/like', async (req, res) => {
 
         // likedArticles가 존재하지 않으면 생성
         if (!user.likedArticles) {
-            user.likedArticles = []; // 빈 배열로 초기화
+            user.likedArticles = []; 
         }
-        // 이미 좋아요를 눌렀는지 확인
         const alreadyLiked = user.likedArticles.includes(postId);
         
         if (!alreadyLiked) {
-            post.likes += 1; // id를 좋아요 배열에 추가
-            user.likedArticles.push(postId); // 유저의 likedArticles에 포스트 ID 추가
-            await post.save();  // db 변경 사항 저장
-            await user.save(); // 유저의 likedArticles 저장
+            post.likes += 1; 
+            user.likedArticles.push(postId); 
+            await post.save();  
+            await user.save(); 
             return res.json({message: '좋아요 추가 성공', post})
         } else {
-            // 좋아요 취소
+
             post.likes -= 1;
-            user.likedArticles = user.likedArticles.filter(id => id !== postId); // 유저의 likedArticles에서 포스트 ID 제거
-            await post.save();  // db 변경 사항 저장
-            await user.save(); // 유저의 likedArticles 저장
+            user.likedArticles = user.likedArticles.filter(id => id !== postId);
+            await post.save();  
+            await user.save(); 
             return res.json({ message: '좋아요 취소 성공', likes: post.likes });
         }
     } catch(error) {
@@ -259,68 +257,81 @@ app.post('/posts/:postId/like', async (req, res) => {
 });
 
 // 게시글 댓글 가져오기
-app.get('/posts/:postID/comments', async (req, res) => {
-    const {postID} = req.params;
-    console.log("postID: ", postID)
+app.get('/posts/:replyID/comments', async (req, res) => {
+    
+    const replyId = req.params.replyID;
+
+    if (!replyId) {
+        return res.status(400).json({ message: "댓글 가져오기 중 오류가 발생했습니다." });
+    }
     try {
-        const post = await Post.findOne({ id: postID });
+        if (replyId.length !== 24) {
+            return res.status(400).json({ message: "댓글 가져오기 중 오류가 발생했습니다." });
+        }
+
+        const comment = await Reply.findById(replyId);
+
+        if (!comment) {
+            return res.status(404).json({ message: "댓글을 찾을 수 없습니다." });
+        }
+        return res.json(comment);
+
+    } catch (error) {
+        console.error('개별 댓글 가져오기 중 오류:', error.message);
+        res.status(500).json({ message: '댓글 가져오기 중 오류가 발생했습니다.' });
+    }
+});
+
+// 해당 포스트의 모든 댓글 가져오기
+app.get('/replies/post/:postId', async (req, res) => {  
+    try {
+        const post = await Post.findById(req.params.postId).populate('comments'); 
         if (!post) {
             return res.status(404).json({ message: "포스트를 찾을 수 없습니다." });
         }
-
-        return res.json(post.comments); // 댓글 배열 반환
+        res.json(post.comments);
     } catch (error) {
-        console.error('댓글 가져오기 중 오류:', error.message);
-        console.log("postID: ", postID)
+        console.error('전체 댓글 가져오기 중 오류:', error.message);
         res.status(500).json({ message: '댓글 가져오기 중 오류가 발생했습니다.' });
     }
 });
 
 // 게시글 댓글 추가
-app.post('/posts/:postObjId/comment', async (req, res) => {
-    const postObjId = req.params.postObjId;
-    console.log("postObjId: ", postObjId)
-    const { userId, commentText, postId } = req.body;
+app.post('/posts/:postId/comment', async (req, res) => {
+    const { userID, userName, password, replyText } = req.body.newComment;
+    const postId = req.params.postId;
 
     try {
-        // db에서 포스트 찾기
-        const post = await Post.findOne({  _id: postObjId });
+        const post = await Post.findOne({  _id: postId });
         if (!post) {
             return res.status(404).json({ message: "포스트를 찾을 수 없습니다." }); 
         }
 
-        // 유저를 userModel DB에서 찾기
-        const user = await Users.findOne({ account: userId });
+        const user = await Users.findOne({ _id: userID });
         if (!user) {
             return res.status(404).json({ message: "유저를 찾을 수 없습니다." });
         }
 
         // commentedArticles가 존재하지 않으면 생성
         if (!user.commentedArticles) {
-            user.commentedArticles = []; // 빈 배열로 초기화
+            user.commentedArticles = []; 
         }
 
-        // 새로운 댓글을 위한 고유 ID 생성
-        const newCommentId = post.comments.reduce((maxId, comment) => {
-            return Math.max(maxId, comment.id || 0); 
-        }, 0) + 1;  // 마지막 댓글 ID에서 증가
-
-        // 댓글 객체 생성
-        const newComment = {
-            id: post.comments.length + 1,
-            userId: user._id,
-            commentText,
-            date: new Date().toISOString().split('T')[0], // 현재 날짜를 YYYY-MM-DD 형식으로 가져오기
-            time: new Date().toISOString().split('T')[1].split('.')[0], // 현재 시간을 HH:mm:ss 형식으로 가져오기
-        };
-        post.comments.push(newComment); // 포스트의 댓글 배열에 댓글 추가
-
+        const newComment =  new Reply({
+            replyTarget: 'article',
+            userID,
+            userName,
+            password,
+            replyText,
+        });
+        const savedComment = await newComment.save(); 
+        console.log("저장된 댓글:", savedComment);
+        post.comments.push(newComment._id); 
+        
         // 사용자가 이 포스트에 대한 첫 댓글이라면 userModel의 commentedArticles에 postId 추가
         if (!user.commentedArticles.includes(postId)) {
             user.commentedArticles.push(postId);
         }
-
-        // 포스트와 사용자 모두 변경 사항 저장
         await post.save();
         await user.save();
 
@@ -333,34 +344,40 @@ app.post('/posts/:postObjId/comment', async (req, res) => {
 
 // 게시글 댓글 삭제
 app.delete('/posts/:postId/comment/:commentId', async (req, res) => {
-    const postId = Number(req.params.postId);
-    const commentId = Number(req.params.commentId);
+    const postId = req.params.postId;
+    const commentId = req.params.commentId;
     
     try {
-        // db에서 포스트 찾기
-        const post = await Post.findOne({ id: postId });
+        const post = await Post.findById(postId);
         if (!post) {
             return res.status(404).json({ message: "포스트를 찾을 수 없습니다." }); 
         }
 
-        // 댓글이 포스트에 존재하는지 확인
-        const commentIndex = post.comments.findIndex(comment => comment.id === commentId);
+        const commentIndex = post.comments.findIndex(comment => comment.toString() === commentId);
         if (commentIndex === -1) {
             return res.status(404).json({ message: "댓글을 찾을 수 없습니다." }); 
         }
+        const { password } = req.body;
+        const commentToDelete = await Reply.findById(commentId);
 
-        // 댓글 삭제
+        if (commentToDelete) {
+            if (commentToDelete.password !== password) {
+                return res.status(403).json({ message: "비밀번호가 일치하지 않습니다." }); 
+            }
+        } else {
+            return res.status(404).json({ message: "댓글을 찾을 수 없습니다." });
+        }
+
         post.comments.splice(commentIndex, 1); 
 
-        // 사용자의 commentedArticles에서 해당 포스트 ID 삭제
         const user = await Users.findOne({ "commentedArticles": postId });
         if (user) {
             user.commentedArticles = user.commentedArticles.filter(id => id !== postId); 
-            await user.save(); // 변경 사항 저장
+            await user.save(); 
         }
-
-        // 포스트 변경 사항 저장
         await post.save();
+
+        await Reply.findByIdAndDelete(commentId); 
 
         return res.json({ message: '댓글이 삭제되었습니다.', post }); 
     } catch (error) {
@@ -505,16 +522,13 @@ app.post('/guestbooks/reply/:id', async (req, res) => { // 방명록 답글 작�
 
 // 마이페이지
 app.post('/mypage', async(req,res) => {
-  console.log(req.body)
   const { userAccount } = req.body;
   try{
     const findUser = await User.findOne({ account: userAccount });
-    console.log("Query result:", findUser);
     if (!findUser) {
-      console.log('유저를 찾을 수 없습니다');
       return res.status(404).json({ message: '유저를 찾을 수 없습니다' });
     }
-    console.log('유저 데이터 찾기 성공')
+
 
     res.json({
       _id: findUser._id,
@@ -531,19 +545,15 @@ app.post('/mypage', async(req,res) => {
 
 // 내 정보 수정
 app.post('/mypage/edit',async(req,res)=>{
-  console.log(req.body);
   const {_id,userName,userImage,account} = req.body;
   try{
     const updatedUser = await User.findOneAndUpdate(
       { _id: _id },
       { userName, userImage, account },
       { new: true });
-    console.log('DB에서 찾은 결과: ', updatedUser)
     if (!updatedUser) {
-      console.log('유저를 찾을 수 없습니다');
       return res.status(404).json({ message: '유저를 찾을 수 없습니다' });
     }
-    console.log('유저 데이터 찾기 성공')
     res.json({
       _id: updatedUser._id,
       account: updatedUser.account,
