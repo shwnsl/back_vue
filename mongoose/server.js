@@ -120,7 +120,7 @@ app.post('/login', async (req, res) => {
         );
 
         // 로그인 성공, 실패
-        res.json({ message: '로그인 성공', token });
+        res.json({ user, token });
     } catch(error) {
         console.error(error);
         res.status(500).json({ message: '로그인 실패' });
@@ -167,11 +167,11 @@ app.post('/post', async (req, res) => {
     try {
         const newPost = new Post({
             title,
-            thumbIndex: images.length === 0 ? null : 0,
+            thumbIndex: 0,
             category: Number(category),
             movieID,
             text,
-            images,
+            images: images,
             author
         });
 
