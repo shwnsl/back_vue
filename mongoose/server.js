@@ -521,15 +521,16 @@ app.post('/guestbooks/reply/:id', async (req, res) => { // 방명록 답글 작�
 });
 
 // 마이페이지
-app.post('/mypage', async(req,res) => {
-  const { userAccount } = req.body;
+app.get('/mypage', async(req,res) => {
+  const { account } = req.body;
+
   try{
-    const findUser = await User.findOne({ account: userAccount });
+    const findUser = await Users.findOne( account );
+    console.log('유저 찾기 성공: ', findUser)
+    // res.json(findUser)
     if (!findUser) {
       return res.status(404).json({ message: '유저를 찾을 수 없습니다' });
     }
-
-
     res.json({
       _id: findUser._id,
       account: findUser.account,
@@ -547,7 +548,7 @@ app.post('/mypage', async(req,res) => {
 app.post('/mypage/edit',async(req,res)=>{
   const {_id,userName,userImage,account} = req.body;
   try{
-    const updatedUser = await User.findOneAndUpdate(
+    const updatedUser = await Users.findOneAndUpdate(
       { _id: _id },
       { userName, userImage, account },
       { new: true });
