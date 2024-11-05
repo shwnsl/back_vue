@@ -13,7 +13,6 @@ const replySchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    
     reReplies: [ String ],
     createdAt: {
         type: Date,
