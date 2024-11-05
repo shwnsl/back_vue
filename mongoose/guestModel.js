@@ -11,17 +11,17 @@ const guestSchema = new mongoose.Schema({
         userImage: String,
         password: String
     },
-    writtenDate: {
-        type: Date,
-        default: Date.now
-    },
     text: String,
     replies: [
         {
             type: Object,
             ref: 'GuestbookReply'
         }
-    ]
+    ],
+    createdAt: {
+        type: Date,
+        default: Date.now
+    }
 }, { collection: 'guestbooks' });
 
 module.exports = mongoose.model('Guestbook', guestSchema);

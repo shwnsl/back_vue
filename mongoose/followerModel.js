@@ -1,10 +1,6 @@
 const mongoose = require('mongoose');
 
 const followSchema = new mongoose.Schema({
-    id: {
-        type: Number,
-        required: true,
-    },
     userName: {
         type: String,
         required: true,
@@ -12,8 +8,8 @@ const followSchema = new mongoose.Schema({
     followers: [
         {
             user: {
-                type: String,
-                ref: "Users",
+                type: Number,
+                ref: 'Users',
             }
         }
     ]

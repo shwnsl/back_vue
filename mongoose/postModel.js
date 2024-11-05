@@ -1,52 +1,28 @@
 const mongoose = require('mongoose');
 
 const postSchema = new mongoose.Schema({
-    // title: {
-    //     type: String,
-    //     required: true
-    // },
-    // content: {
-    //     type: String,
-    //     required: true
-    // },
-    // category: {
-    //     type: String,
-    //     required: true
-    // },
-    // images: {
-    //     type: [String], 
-    //     required: false
-    // },
-    // createdAt: {
-    //     type: Date,
-    //     default: Date.now
-    // }
-  title: { type: String, required: true },
-  thumbIndex: { type: Number },
-  category: { type: String, required: true },
-  movieID: { type: Number, required: false },
-  text: { type: String, required: true },
-  images: {
-    type: [ String ],
-    required: false,
-  },
-  comments: [
-    {
-      id: { type: Number },
-      userId: { type: Number }, 
-      commentText: { type: String }, 
-      date: { type: String },
-      time: { type: String }, 
+    title: { type: String, required: true },
+    thumbIndex: { type: Number, required: true },
+    category: { type: String, required: true },
+    movieID: { type: Number, required: false },
+    text: { type: String, required: true },
+    images: {
+        type: [
+            {
+                index: { type: Number, required: true },
+                imageURL: { type: String, required: true },
+                alt: { type: String, required: false },
+            },
+        ],
+        required: false,
     },
-  ],
-  likes: [{ type: Number }],
-  // author: { type: Object, required: true },
-  // date: { type: String, required: true },
-  // time: { type: String, required: true },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
+    comments: [ String ], // replies의 _id 배열
+    likes: [ String ], // users의 _id 배열 (users가 liked한 배열에도 마찬가지로 해당 글의 _id를 추가해야 함)
+    author: { type: String, required: true }, // users의 _id
+    createdAt: {
+        type: Date,
+        default: Date.now
+    }
 });
 
 module.exports = mongoose.model('Post', postSchema);
