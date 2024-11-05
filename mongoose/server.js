@@ -112,11 +112,6 @@ app.post('/login', async (req, res) => {
             return res.status(400).json({ message: '비밀번호가 일치하지 않습니다.' });
         }
 
-        const users = await Users.findOne({ account });
-        if (!user) {
-            return res.status(404).json({ message: '사용자 정보가 일치하지 않습니다.' });
-        }
-
         // 비밀번호가 일치하면 JWT 토큰 발급
         const token = jwt.sign(
             { id: user._id, account: user.userAccount }, // 토큰에 포함할 사용자 정보 (Payload)
@@ -125,7 +120,7 @@ app.post('/login', async (req, res) => {
         );
 
         // 로그인 성공, 실패
-        res.json({ message: '로그인 성공', token, userId: users._id, userName: users.userName });
+        res.json({ user, token });
 
     } catch(error) {
         console.error(error);
