@@ -548,13 +548,15 @@ app.get('/mypage', async(req,res) => {
 })
 
 // 내 정보 수정
-app.post('/mypage/edit',async(req,res)=>{
-  const {_id,userName,userImage,account} = req.body;
+app.post('/mypage/edit', upload.single('userImage'), async(req,res)=>{
+  const {_id, userName, account} = req.body;
+  const userImage = req.file ? req.file.path : null;
   try{
     const updatedUser = await Users.findOneAndUpdate(
       { _id: _id },
       { userName, userImage, account },
       { new: true });
+
     if (!updatedUser) {
       return res.status(404).json({ message: '유저를 찾을 수 없습니다' });
     }
@@ -563,7 +565,6 @@ app.post('/mypage/edit',async(req,res)=>{
       account: updatedUser.account,
       userName: updatedUser.userName,
       userImage: updatedUser.userImage,
-      commentedArticles: updatedUser.commentedArticles,
     })
   }catch (error){
     res.status(500).json({ message: '유저 정보 수정 실패', error });
