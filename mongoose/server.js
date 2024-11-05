@@ -128,7 +128,6 @@ app.post('/login', async (req, res) => {
     }
 });
 
-
 // 토큰 검증 미들웨어
 const tokenMiddleware = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -255,72 +254,51 @@ app.post('/posts/:postId/like', async (req, res) => {
     }
 });
 
-// 게시글 댓글 가져오기
-app.get('/posts/:replyID/comments', async (req, res) => {
-
-    const replyId = req.params.replyID;
-
-    if (!replyId) {
-        return res.status(400).json({ message: "댓글 가져오기 중 오류가 발생했습니다." });
-    }
-    try {
-        if (replyId.length !== 24) {
-            return res.status(400).json({ message: "댓글 가져오기 중 오류가 발생했습니다." });
-        }
-
-        const comment = await Reply.findById(replyId);
-
-        if (!comment) {
-            return res.status(404).json({ message: "댓글을 찾을 수 없습니다." });
-        }
-        return res.json(comment);
-
-    } catch (error) {
-        console.error('개별 댓글 가져오기 중 오류:', error.message);
-        res.status(500).json({ message: '댓글 가져오기 중 오류가 발생했습니다.' });
-    }
-});
-
 // 게시글 댓글 추가
-app.post('/posts/:postId/comment', async (req, res) => {
-    const { userID, userName, password, replyText } = req.body.newComment;
-    const postId = req.params.postId;
+app.post('/posts/:postID/comment', async (req, res) => {
+    const postID = req.params.postID;
+    const { replyTarget, userID, userName, password, replyText } = req.body;
 
     try {
-        const post = await Post.findOne({  _id: postId });
+        const post = await Post.findById(postID);
+
         if (!post) {
-            return res.status(404).json({ message: "포스트를 찾을 수 없습니다." });
+            return res.status(404).json({ message: '포스트를 찾을 수 없습니다.' });
         }
 
-        const user = await Users.findOne({ _id: userID });
-        if (!user) {
-            return res.status(404).json({ message: "유저를 찾을 수 없습니다." });
-        }
+        const user = await Users.findById(userID);
+
+        if (!user) console.log('존재하지 않는 유저');
 
         // commentedArticles가 존재하지 않으면 생성
-        if (!user.commentedArticles) {
+        if (user && !user.commentedArticles) {
             user.commentedArticles = [];
         }
 
         const newComment =  new Reply({
-            replyTarget: 'article',
-            userID,
-            userName,
-            password,
-            replyText,
+            replyTarget: replyTarget,
+            repliedArticle: postID,
+            userID: userID,
+            userName: userName,
+            password: password ? await bcrypt.hash(password, 10) : null,
+            replyText: replyText,
+            reReplies: []
         });
+
         const savedComment = await newComment.save();
-        console.log("저장된 댓글:", savedComment);
+
+        console.log('저장된 댓글 :', savedComment._id);
         post.comments.push(newComment._id);
 
         // 사용자가 이 포스트에 대한 첫 댓글이라면 userModel의 commentedArticles에 postId 추가
-        if (!user.commentedArticles.includes(postId)) {
-            user.commentedArticles.push(postId);
+        if (user && !user.commentedArticles.includes(postID)) {
+            user.commentedArticles.push(postID);
         }
-        await post.save();
-        await user.save();
 
-        return res.json({ message: '댓글이 추가되었습니다.', comment: newComment });
+        await post.save();
+        if (user) await user.save();
+
+        return res.status(200).json({ message: 'Reply Attached Successfully' });
     } catch (error) {
         console.error('댓글 추가 중 오류:', error.message);
         res.status(500).json({ message: '댓글 추가 중 오류가 발생했습니다.' });
