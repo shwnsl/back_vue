@@ -128,7 +128,6 @@ app.post('/login', async (req, res) => {
     }
 });
 
-
 // 토큰 검증 미들웨어
 const tokenMiddleware = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -253,122 +252,6 @@ app.post('/posts/:postId/like', async (req, res) => {
     }
 });
 
-// 게시글 댓글 가져오기
-app.get('/posts/:replyID/comments', async (req, res) => {
-
-    const replyId = req.params.replyID;
-
-    if (!replyId) {
-        return res.status(400).json({ message: "댓글 가져오기 중 오류가 발생했습니다." });
-    }
-    try {
-        if (replyId.length !== 24) {
-            return res.status(400).json({ message: "댓글 가져오기 중 오류가 발생했습니다." });
-        }
-
-        const comment = await Reply.findById(replyId);
-
-        if (!comment) {
-            return res.status(404).json({ message: "댓글을 찾을 수 없습니다." });
-        }
-        return res.json(comment);
-
-    } catch (error) {
-        console.error('개별 댓글 가져오기 중 오류:', error.message);
-        res.status(500).json({ message: '댓글 가져오기 중 오류가 발생했습니다.' });
-    }
-});
-
-// 게시글 댓글 추가
-app.post('/posts/:postId/comment', async (req, res) => {
-    const { userID, userName, password, replyText } = req.body.newComment;
-    const postId = req.params.postId;
-
-    try {
-        const post = await Post.findOne({  _id: postId });
-        if (!post) {
-            return res.status(404).json({ message: "포스트를 찾을 수 없습니다." });
-        }
-
-        const user = await Users.findOne({ _id: userID });
-        if (!user) {
-            return res.status(404).json({ message: "유저를 찾을 수 없습니다." });
-        }
-
-        // commentedArticles가 존재하지 않으면 생성
-        if (!user.commentedArticles) {
-            user.commentedArticles = [];
-        }
-
-        const newComment =  new Reply({
-            replyTarget: 'article',
-            userID,
-            userName,
-            password,
-            replyText,
-        });
-        const savedComment = await newComment.save();
-        console.log("저장된 댓글:", savedComment);
-        post.comments.push(newComment._id);
-
-        // 사용자가 이 포스트에 대한 첫 댓글이라면 userModel의 commentedArticles에 postId 추가
-        if (!user.commentedArticles.includes(postId)) {
-            user.commentedArticles.push(postId);
-        }
-        await post.save();
-        await user.save();
-
-        return res.json({ message: '댓글이 추가되었습니다.', comment: newComment });
-    } catch (error) {
-        console.error('댓글 추가 중 오류:', error.message);
-        res.status(500).json({ message: '댓글 추가 중 오류가 발생했습니다.' });
-    }
-});
-
-// 게시글 댓글 삭제
-app.delete('/posts/:postId/comment/:commentId', async (req, res) => {
-    const postId = req.params.postId;
-    const commentId = req.params.commentId;
-
-    try {
-        const post = await Post.findById(postId);
-        if (!post) {
-            return res.status(404).json({ message: "포스트를 찾을 수 없습니다." });
-        }
-
-        const commentIndex = post.comments.findIndex(comment => comment.toString() === commentId);
-        if (commentIndex === -1) {
-            return res.status(404).json({ message: "댓글을 찾을 수 없습니다." });
-        }
-        const { password } = req.body;
-        const commentToDelete = await Reply.findById(commentId);
-
-        if (commentToDelete) {
-            if (commentToDelete.password !== password) {
-                return res.status(403).json({ message: "비밀번호가 일치하지 않습니다." });
-            }
-        } else {
-            return res.status(404).json({ message: "댓글을 찾을 수 없습니다." });
-        }
-
-        post.comments.splice(commentIndex, 1);
-
-        const user = await Users.findOne({ "commentedArticles": postId });
-        if (user) {
-            user.commentedArticles = user.commentedArticles.filter(id => id !== postId);
-            await user.save();
-        }
-        await post.save();
-
-        await Reply.findByIdAndDelete(commentId);
-
-        return res.json({ message: '댓글이 삭제되었습니다.', post });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: '댓글 삭제 중 오류가 발생했습니다.' });
-    }
-});
-
 // 게시글 수정
 app.put('/posts/:id', async(req, res) => {
   const { id } = req.params;
@@ -409,40 +292,6 @@ app.get('/replies/:id', async (req, res) => { // 댓글 가져오기
     }
 });
 
-app.post('/reply', async (req, res) => { // 댓글 작성 (진행중)
-    const {  } = req.body;
-
-    try {
-        const newReply = new Reply({  });
-        const replyTarget = Post.findById() // 대상 게시물 찾기
-
-        await newReply.save(); // 댓글 저장
-        await replyTarget.findByIdAndUpdate(); // 대상 게시물의 댓글 배열에 작성된 댓글의 ID 업데이트
-
-        res.status(200).json({ message: 'Reply saved Successgully' });
-    } catch(error) {
-        console.error(error);
-        res.status(500).json({ message: 'Reply failed' });
-    }
-});
-
-app.post('/re-reply', async (req, res) => { // 대댓글 작성 (진행중)
-    const {  } = req.body;
-
-    try {
-        const newReply = new Reply({  });
-        const replyTarget = Reply.findById() // 대상 댓글 찾기
-
-        await newReply.save(); // 댓글 저장
-        await replyTarget.findByIdAndUpdate(); // 대상 댓글의 댓글 배열에 작성된 댓글의 ID 업데이트
-
-        res.status(200).json({ message: 'Reply saved Successgully' });
-    } catch(error) {
-        console.error(error);
-        res.status(500).json({ message: 'Reply failed' });
-    }
-});
-
 app.get('/replies/post/:id', async (req, res) => { // 포스트에 해당되는 댓글 가져오기
     try {
         const replies = await Reply.find({ repliedArticle: req.params.id });
@@ -450,6 +299,105 @@ app.get('/replies/post/:id', async (req, res) => { // 포스트에 해당되는 
         res.json(replies);
     } catch(error) {
         res.status(500).json({ message: 'An error occurred' });
+    }
+});
+
+app.post('/reply/:postID', async (req, res) => { // 댓글, 대댓글 작성
+    const postID = req.params.postID;
+    const { replyTarget, userID, userName, password, replyText, reReplies } = req.body;
+
+    console.log(replyTarget)
+
+    try {
+        const post = await Post.findById(postID);
+        const targetReply = replyTarget.target === 'reply' ? await Reply.findById(replyTarget.targetID) : null;
+
+        if (!post) {
+            return res.status(404).json({ message: '포스트를 찾을 수 없습니다.' });
+        }
+
+        const user = await Users.findById(userID);
+
+        if (!user) console.log('유저가 존재하지 않습니다.');
+
+        // commentedArticles가 존재하지 않으면 생성
+        if (user && !user.commentedArticles) {
+            user.commentedArticles = [];
+        }
+
+        const newComment = new Reply({
+            replyTarget: replyTarget,
+            repliedArticle: postID,
+            userID: userID,
+            userName: userName,
+            password: password ?? null,
+            replyText: replyText,
+            reReplies: reReplies
+        });
+
+        const savedComment = await newComment.save();
+
+        console.log('저장된 댓글 :', savedComment);
+        post.comments.push(newComment._id);
+
+        // 사용자가 이 포스트에 대한 첫 댓글이라면 userModel의 commentedArticles에 postId 추가
+        if (user && !user.commentedArticles.includes(postID)) {
+            user.commentedArticles.push(postID);
+        }
+
+        if (replyTarget.target === 'reply') {
+            targetReply.reReplies.push(savedComment._id);
+
+            await targetReply.save();
+        }
+
+        await post.save();
+        if (user) await user.save();
+
+        return res.status(200).json({ message: 'Reply Attached Successfully' });
+    } catch (error) {
+        console.error('댓글 추가 중 오류:', error.message);
+        res.status(500).json({ message: '댓글 추가 중 오류가 발생했습니다.' });
+    }
+});
+
+app.delete('/reply/:replyID', async (req, res) => { // 댓글 삭제
+    const replyID = req.params.replyID;
+    const postID = req.body.postID;
+    const inputPassword = req.body.password;
+
+    try {
+        const post = await Post.findById(postID);
+        const replyToDelete = await Reply.findById(replyID);
+        const isReplyExist = post.comments.find(reply => reply === replyID);
+
+        console.log(replyToDelete)
+        console.log(inputPassword);
+
+        if (!post) {
+            return res.status(404).json({ message: '포스트를 찾을 수 없습니다.' });
+        }
+
+        if (!!isReplyExist === false) {
+            return res.status(404).json({ message: '댓글을 찾을 수 없습니다.' });
+        }
+
+        if (replyToDelete) {
+            if (replyToDelete.password !== inputPassword) {
+                return res.status(403).json({ message: '비밀번호가 일치하지 않습니다.' });
+            }
+        } else {
+            return res.status(404).json({ message: '댓글을 찾을 수 없습니다.' });
+        }
+
+        post.comments.filter(reply => reply !== replyID); // 대상 댓글이 존재하는 Post 의 comment 배열에서 해당 댓글 제거
+
+        await post.save();
+        await Reply.findByIdAndDelete(replyID);
+
+        return res.status(200).json({ message: '댓글이 삭제되었습니다.', post });
+    } catch (error) {
+        res.status(500).json({ message: '댓글 삭제 중 오류가 발생했습니다.' });
     }
 });
 
