@@ -16,7 +16,6 @@ const User = require('./registerModel');
 const Users = require('./userModel');
 const Post = require('./postModel');
 const Reply = require('./replyModel');
-const ReReply = require('./reReplyModel');
 const Guestbook = require('./guestModel');
 const GuestbookReply = require('./guestReplyModel');
 const Follow = require('./followerModel');
@@ -97,17 +96,17 @@ app.post('/register', upload.single('userImage'), async (req, res) => {
 // 로그인 라우트
 app.post('/login', async (req, res) => {
     try {
-        const { account, password } = req.body;
+        const { userAccount, userPassword } = req.body;
 
         // 유저 찾기
-        const user = await User.findOne({ account });
+        const user = await Users.findOne({ account: userAccount });
 
         if (!user) {
             return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
         }
 
         // 비밀번호 비교
-        const isMatch = await bcrypt.compare(password, user.password);
+        const isMatch = await bcrypt.compare(userPassword, user.password);
 
         if (!isMatch) {
             return res.status(400).json({ message: '비밀번호가 일치하지 않습니다.' });
@@ -120,13 +119,14 @@ app.post('/login', async (req, res) => {
 
         // 비밀번호가 일치하면 JWT 토큰 발급
         const token = jwt.sign(
-            { id: user._id, account: user.account }, // 토큰에 포함할 사용자 정보 (Payload)
+            { id: user._id, account: user.userAccount }, // 토큰에 포함할 사용자 정보 (Payload)
             SECRET_KEY, // 비밀키를 사용해 서명
             { expiresIn: '1h' } // 토큰 유효기간 (1시간)
         );
 
         // 로그인 성공, 실패
         res.json({ message: '로그인 성공', token, userId: users._id, userName: users.userName });
+
     } catch(error) {
         console.error(error);
         res.status(500).json({ message: '로그인 실패' });
@@ -168,17 +168,21 @@ app.get('/profile', tokenMiddleware, async (req, res) => {
 
 // 글쓰기
 app.post('/post', async (req, res) => {
-    const { title, content, category, images } = req.body;
+    const { title, category, movieID, text, images, author } = req.body;
 
     try {
         const newPost = new Post({
             title,
-            content,
-            category,
-            images
+            thumbIndex: 0,
+            category: Number(category),
+            movieID,
+            text,
+            images: images,
+            author
         });
 
         await newPost.save();
+
         res.status(200).json({ message: 'Post saved Successgully' });
     } catch(error) {
         console.error(error);
@@ -417,6 +421,16 @@ app.delete('/posts/:id', async(req, res) => {
     }
 });
 
+app.get('/replies/:id', async (req, res) => { // 댓글 가져오기
+    try {
+        const replies = await Reply.findById(req.params.id); // 포스트에서 아이디 가져오기
+
+        res.json(replies);
+    } catch(error) {
+        res.status(500).json({ message: 'An error occurred' });
+    }
+});
+
 app.post('/reply', async (req, res) => { // 댓글 작성 (진행중)
     const {  } = req.body;
 
@@ -451,21 +465,11 @@ app.post('/re-reply', async (req, res) => { // 대댓글 작성 (진행중)
     }
 });
 
-app.get('/replies/:id', async (req, res) => { // 댓글 가져오기
+app.get('/replies/post/:id', async (req, res) => { // 포스트에 해당되는 댓글 가져오기
     try {
-        const replies = await Reply.findById(req.params.id); // 포스트에서 아이디 가져오기
+        const replies = await Reply.find({ repliedArticle: req.params.id });
 
         res.json(replies);
-    } catch(error) {
-        res.status(500).json({ message: 'An error occurred' });
-    }
-});
-
-app.get('/re-replies/:id', async (req, res) => { // 대댓글 가져오기
-    try {
-        const reReplies = await ReReply.findById(req.body.reReplyID);
-
-        res.json(reReplies.sort((a, b) => { return b.createdAt - a.createdAt }));
     } catch(error) {
         res.status(500).json({ message: 'An error occurred' });
     }
@@ -475,7 +479,7 @@ app.get('/guestbooks', async (req, res) => { // 방명록 가져오기
     try {
         const guestbookList = await Guestbook.find();
 
-        res.json(guestbookList.sort((a, b) => { return b.writtenDate - a.writtenDate }));
+        res.json(guestbookList.sort((a, b) => { return b.createdAt - a.createdAt }));
     } catch(error) {
         res.status(500).json({ message: 'An error occurred' });
     }
@@ -505,16 +509,34 @@ app.post('/guestbooks/write', async (req, res) => { // 방명록 작성
     }
 });
 
-app.post('/guestbooks/reply/:id', async (req, res) => { // 방명록 답글 작성 - 미완성
-    const {} = req.body;
-
+app.delete('/guestbooks/:id', async (req, res) => { // 방명록 글 삭제
     try {
-        const targetGuestbook = Guestbook.findById(req.params.id);
-        const newGuestbookReply = new GuestbookReply({});
+        await Guestbook.findByIdAndDelete(req.params.id);
+
+        res.status(200).json({ message: 'Guestbook Removed Successfully' });
+    } catch(error) {
+        res.status(500).json({ message: 'An error occurred' });
+    }
+});
+
+app.post('/guestbooks/reply/:id', async (req, res) => { // 방명록 답글 작성 - 미완성
+    try {
+        const newGuestbookReply = new GuestbookReply(req.body);
+        const targetGuestbook = Guestbook.findByIdAndUpdate(req.params.id, targetGuestbook.replies.push(newGuestbookReply._id));
 
         await newGuestbookReply.save();
 
         res.status(200).json({ message: 'Guestbook Reply Attached Successfully' });
+    } catch(error) {
+        res.status(500).json({ message: 'An error occurred' });
+    }
+});
+
+app.get('/guestbooks/replies/:id', async (req, res) => { // 방명록 글의 전체 답글 가져오기
+    try {
+        const replies = await GuestbookReply.find({ targetGuestbook: req.params.id });
+
+        res.json(replies);
     } catch(error) {
         res.status(500).json({ message: 'An error occurred' });
     }

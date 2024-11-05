@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const guestbookReplySchema = new mongoose.Schema({
+    targetGuestbook: String,
     replyUserID: String,
     replyText: String,
     createdAt: {
