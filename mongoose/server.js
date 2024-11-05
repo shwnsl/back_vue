@@ -199,10 +199,8 @@ app.get('/posts', async (req, res) => {
 // 게시글 상세
 app.get('/posts/:id', async(req, res) => {
     const { id } = req.params;
-
     try {
-        const post = await Post.findOne({ _id: id });
-
+        const post = await Post.findOne({ _id: id }); 
         if (!post) {
             return res.status(404).json({ message: "포스트를 찾을 수 없음" });
         }
@@ -373,16 +371,15 @@ app.delete('/posts/:postId/comment/:commentId', async (req, res) => {
 
 // 게시글 수정
 app.put('/posts/:id', async(req, res) => {
-    const { id } = req.params;
-    const { title, content, category, images } = req.body;
-
-    try {
-        const editPost = await Post.findByIdAndUpdate(
-            id,
-            { title, content, category, images },
-            { new: true }
+  const { id } = req.params;
+  const { title, text, category, images } = req.body;
+  try {
+      const editPost = await Post.findByIdAndUpdate(
+          id,
+          { title, text, category, images },
+          { new: true }
         );
-
+        
         res.json({ message: 'Post edited' });
     } catch(error) {
         res.status(500).json({ message: 'Edit failed' });
@@ -591,45 +588,51 @@ app.get('/user-info/:id', async (req, res) => { // 개별 사용자 정보 가�
 })
 
 // 팔로우 기능
-app.post('/users/:userId/follow', async (req, res) => {
-    const userID = req.body.userID;
-    const followerID = req.body.followerID;
+app.post('/users/:userId/follow', async (req, res, next) => {
+    const { userID, followerID } = req.body;
 
-    Users.findByIdAndUpdate(userID, { $push: { followers: { follower: followerID } } }, { safe: true, upsert: true, new: true })
-    .then(result => {
-        return Follow.findByIdAndUpdate(
+    try {
+        const updatedUser = await Users.findByIdAndUpdate(
+            userID,
+            { $push: { followers: { follower: followerID } } },
+            { safe: true, upsert: true, new: true}
+        );
+
+        const updatedFollower = await Follow.findByIdAndUpdate(
             followerID,
             { $push: { users: { user: userID } } },
-            { safe: true, upsert: true, new: true },
+            { safe: true, upsert: true, new: true}
         );
-    })
-    .then(result => {
-        res.status(200).json(result);
-    })
-    .catch(err => {
-        next(err);
-    });
+        const userWithFollowers = await Users.findById(userID).select('followers');
+        console.log('Updated followers:', userWithFollowers.followers);
+
+        res.status(200).json({ user: updatedUser, follower: updatedFollower });
+    } catch (error) {
+        next(error)
+    }
 });
 
 // 언팔로우 기능
-app.post('/users/:userId/unfollow', async (req, res) => {
-    const userID = req.body.userID;
-    const followerID = req.body.followerID;
+app.post('/users/:userId/unfollow', async (req, res, next) => {
+    const { userID, followerID } = req.body;
 
-    Users.findByIdAndUpdate(userID, { $pull: { followers: { follower: followerID } } }, { safe: true, upsert: true, new: true })
-    .then(result => {
-        return Follow.findByIdAndUpdate(
+    try {
+        const updatedUser = await Users.findByIdAndUpdate(
+            userID,
+            { $pull: { followers: { follower: followerID } } },
+            { safe: true, upsert: true, new: true}
+        );
+
+        const updatedFollower = await Follow.findByIdAndUpdate(
             followerID,
             { $pull: { users: { user: userID } } },
-            { safe: true, upsert: true, new: true },
+            { safe: true, upsert: true, new: true}
         );
-    })
-    .then(result => {
-        res.status(200).json(result);
-    })
-    .catch(err => {
-        next(err);
-    });
+
+        res.status(200).json({ user: updatedUser, follower: updatedFollower });
+    } catch (error) {
+        next(error)
+    }
 });
 
 app.get('/admin-info', async (req, res) => {
