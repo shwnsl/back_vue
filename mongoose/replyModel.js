@@ -9,7 +9,11 @@ const replySchema = new mongoose.Schema({
     userID: String,
     userName: String,
     password: String,
-    replyText: String,
+    replyText: {
+        type: String,
+        required: true,
+    },
+    
     reReplies: [ String ],
     createdAt: {
         type: Date,

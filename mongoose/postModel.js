@@ -7,6 +7,7 @@ const postSchema = new mongoose.Schema({
     movieID: { type: Number },
     movieGenres: [ Number ],
     text: { type: String, required: true },
+    movieGenres: [Number],
     images: {
         index: true,
         type: [
