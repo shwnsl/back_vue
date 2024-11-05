@@ -4,12 +4,13 @@ const postSchema = new mongoose.Schema({
     title: { type: String, required: true },
     thumbIndex: { type: Number, required: true },
     category: { type: String, required: true },
-    movieID: { type: Number, required: false },
+    movieID: { type: Number },
+    movieGenres: [ Number ],
     text: { type: String, required: true },
     images: {
+        index: true,
         type: [
             {
-                index: { type: Number, required: true },
                 imageURL: { type: String, required: true },
                 alt: { type: String, required: false },
             },
